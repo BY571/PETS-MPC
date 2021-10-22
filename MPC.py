@@ -45,11 +45,11 @@ class MPC():
                                    n_planner=n_planner,
                                    device=device)
 
-    def get_next_action(self, state, model, noise=False):
+    def get_next_action(self, state, model, noise=False, probabilistic=True):
 
         states = np.repeat(state.reshape(1, state.shape[0]), self.n_planner, axis=0)
 
-        actions, returns = self.run_mpc(states, model)
+        actions, returns = self.run_mpc(states, model, probabilistic)
         optimal_action = actions[returns.argmax()]
 
         if noise and self.action_type=="continuous":
@@ -58,17 +58,26 @@ class MPC():
             optimal_action = optimal_action[0]
         return optimal_action
 
-    def run_mpc(self, states, model):
+    def run_mpc(self, states, model, probabilistic=True):
         
         returns = torch.zeros((self.n_planner,1))
         for i in range(self.depth):
             actions = self.policy.get_actions(states)
 
             with torch.no_grad():
-                predictions = model.run_ensemble_prediction(states, actions).mean(0)
-            states = predictions[:, :-1].cpu().numpy()
+                ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions)
+                ensemble_means[:, :, :-1] += states
+                ensemble_means = ensemble_means.mean(0)
+                ensemble_stds = np.sqrt(ensemble_stds).mean(0)
+                
+                if probabilistic:
+                    predictions = ensemble_means + np.random.normal(size=ensemble_means.shape) * ensemble_stds
+                else:
+                    predictions = ensemble_means
+
+            states = predictions[:, :-1]
             
-            returns += predictions[:, -1].unsqueeze(-1).cpu()
+            returns += predictions[:, -1]
             if i == 0:
                 first_actions = deepcopy(actions)
 
