@@ -9,7 +9,7 @@ from buffer import MBReplayBuffer
 import glob
 from utils import save, collect_random
 import random
-from MPC import MPC
+from MPC import MPC, CEM
 from model import MBEnsemble
 from utils import evaluate
 from tqdm import tqdm
@@ -28,6 +28,7 @@ def get_config():
     ## MB params
     parser.add_argument("--mb_buffer_size", type=int, default=100_000, help="")
     parser.add_argument("--ensembles", type=int, default=5, help="")
+    parser.add_argument("--probabilistic", type=int, default=1, help="")
     parser.add_argument("--elite_size", type=int, default=3, help="")
     parser.add_argument("--hidden_size", type=int, default=200, help="")
     parser.add_argument("--mb_lr", type=float, default=1e-3, help="")
@@ -35,8 +36,13 @@ def get_config():
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--n_planner", type=int, default=5000, help="")
-    parser.add_argument("--depth", type=int, default=32, help="")
+    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem"], help="")
+    parser.add_argument("--n_planner", type=int, default=2500, help="")
+    parser.add_argument("--depth", type=int, default=16, help="")
+    parser.add_argument("--iter_update_steps", type=int, default=5, help="")
+    parser.add_argument("--k_best", type=int, default=4, help="")
+    parser.add_argument("--action_noise", type=int, default=0, help="")
+
     
     args = parser.parse_args()
     return args 
@@ -60,8 +66,15 @@ def train(config):
     
     with wandb.init(project="PETS", name=config.run_name, config=config):
         
-        mpc = MPC(evaluation_env.action_space, n_planner=config.n_planner, depth=config.depth, device=device)
-        
+        if config.mpc_type == "random":
+            mpc = MPC(evaluation_env.action_space, n_planner=config.n_planner, depth=config.depth, device=device)
+        elif config.mpc_type == "cem":
+            mpc = CEM(action_space=evaluation_env.action_space,
+                      n_planner=config.n_planner,
+                      horizon=config.depth,
+                      iter_update_steps=config.iter_update_steps,
+                      k_best=config.k_best,
+                      device=device)
         ensemble = MBEnsemble(state_size=state_size,
                               action_size=action_size,
                               config=config,
@@ -86,7 +99,7 @@ def train(config):
                     wandb.log({"Episode": i, "MB mean loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
                     tqdm.write("\nEpisode: {} | Ensemble losses: {}".format(i, losses))
 
-                action = mpc.get_next_action(state, ensemble)
+                action = mpc.get_next_action(state, ensemble, noise=config.action_noise, probabilistic=config.probabilistic)
                 
                 next_state, reward, done, _ = env.step(action)
 
