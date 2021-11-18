@@ -19,7 +19,7 @@ def get_config():
     parser.add_argument("--run_name", type=str, default="PETS-MPC", help="Run name, default: PETS-MPC")
     parser.add_argument("--env", type=str, default="Pendulum-v1", help="Gym environment name, default: Pendulum-v0")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes, default: 100")
-    parser.add_argument("--episode_length", type=int, default=1000, help="Length of one episode, default: 1000")
+    parser.add_argument("--episode_length", type=int, default=500, help="Length of one episode, default: 1000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--log_video", type=int, default=0, help="Log agent behaviour to wanbd when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
