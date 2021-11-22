@@ -11,6 +11,8 @@ class RandomPolicy():
         if type(action_space) == gym.spaces.discrete.Discrete:
             self.action_space = action_space.n
             self.action_type = "discrete"
+            self.action_low = None
+            self.action_high = None
         elif type(action_space) == gym.spaces.box.Box:
             self.action_space = action_space.shape[0]
             self.action_type = "continuous"
@@ -70,22 +72,24 @@ class CEM():
                 action_history.append(actions[None, :]) # shape (horizon, n_planner, action_space)
             
             k_best_rewards, k_best_actions = self.select_k_best(reward_summed, action_history)
-            mu, var = self.update_gaussians(k_best_actions)
+            mu, var = self.update_gaussians(mu, var, k_best_actions)
         
-        best_action = k_best_actions[0, -1, :]#[None, :] # 0 element in the horizon, -1 best planner
-        
-        assert best_action.shape == (self.action_space,)
-        return best_action
+        #best_action = k_best_actions[0, -1, :]#[None, :] # 0 element in the horizon, -1 best planner
+        action = np.random.normal(mu, np.sqrt(var), size=(self.action_space, ))
+        assert action.shape == (self.action_space,)
+        return action
             
     
     def select_k_best(self, rewards, action_hist):
         assert rewards.shape == (self.n_planner, 1)
         idxs = np.argsort(rewards, axis=0)
         action_hist = np.concatenate(action_hist) # shape (horizon, n_planner, action_space)
+
         sorted_actions_hist = action_hist[:, idxs, :].squeeze(2) # sorted (horizon, n_planner, action_space)
-        
+
         k_best_actions_hist = sorted_actions_hist[:, -self.k_best:, :]
         k_best_rewards = rewards[idxs].squeeze(1)[-self.k_best:]
+
         assert k_best_rewards.shape == (self.k_best, 1)
         assert k_best_actions_hist.shape == (self.horizon, self.k_best, self.action_space)
         return k_best_rewards, k_best_actions_hist
@@ -94,8 +98,9 @@ class CEM():
     def update_gaussians(self, old_mu, old_var, best_actions):
         assert best_actions.shape == (self.horizon, self.k_best, self.action_space)
 
-        new_mu = best_actions.mean(0).mean(0)
-        new_var = best_actions.var(0).var(0)
+        new_mu = best_actions[0].mean(0) # take first action in history
+        new_var = best_actions[0].var(0)  # take first action in history
+
         mu = (self.update_alpha * old_mu + (1.0-self.update_alpha) * new_mu)
         #print("old mu: {} new_mu: {} updated mu: {}".format(old_mu, new_mu, self.mu))
         var = (self.update_alpha * old_var + (1.0 - self.update_alpha) * new_var)
