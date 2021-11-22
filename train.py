@@ -37,8 +37,8 @@ def get_config():
 
     #MPC params
     parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem"], help="")
-    parser.add_argument("--n_planner", type=int, default=2500, help="")
-    parser.add_argument("--depth", type=int, default=16, help="")
+    parser.add_argument("--n_planner", type=int, default=500, help="") # 1000
+    parser.add_argument("--depth", type=int, default=30, help="") # 30
     parser.add_argument("--iter_update_steps", type=int, default=5, help="")
     parser.add_argument("--k_best", type=int, default=4, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
