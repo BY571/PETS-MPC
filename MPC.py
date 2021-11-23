@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 import torch
-from copy import deepcopy
+from copy import copy, deepcopy
 
 
 class RandomPolicy():
@@ -160,13 +160,68 @@ class MPC():
 
 
 class PDDM():
-    def __init__(self, action_space, n_planner=200, horizon=7, iter_update_steps=3, k_best=40, gamma=10, beta=0.5, device=None)-> None:
+    def __init__(self, action_space, n_planner=200, horizon=7, gamma=10, beta=0.5, device=None)-> None:
         self.n_planner = n_planner
-        self.k_best = k_best
         self.device = device
         self.update_alpha = 0.25
         self.action_space = action_space.shape[0]
         self.horizon = horizon
-        self.iter_update_steps = iter_update_steps
         self.gamma = gamma
         self.beta = beta
+        self.mu = np.zeros(self.action_space)
+        self.n = np.zeros(self.n_planner)
+        
+    def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
+        print("current mu: ", self.mu, "\ncurrent n", self.n)
+        print("init_state type", type(initial_state))
+        initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
+        first_actions, returns = self.get_pred_trajectories(initial_state, model, probabilistic)
+        
+        optimal_action = first_actions[returns.argmax()]
+        if noise:
+            optimal_action += np.random.normal(0, 0.005, size=optimal_action.shape)
+
+        self.update_mu(first_actions, returns)
+        return optimal_action
+        
+    def update_mu(self, actions, returns):
+        nenner = (np.exp(self.gamma * returns) * actions).sum(0)
+
+        assert nenner.shape == (self.action_space,), "should be shape {} but has shape: {}".format(self.action_space, nenner.shape)
+        zähler = np.exp(self.gamma * returns).sum() + 1e-12
+        print("Nenner: {} | Zähler: {}".format(nenner, zähler))
+        #assert zähler.shape == (1,)
+        self.mu = nenner/zähler
+    
+    def sample_actions(self, ):
+        u = np.random.normal(0, 1, size=(self.n_planner, ))
+        self.n = self.beta * u + (1 - self.beta) * deepcopy(self.n)
+        assert self.n.shape == (self.n_planner, )
+        actions = self.mu + self.n[:, None]
+        assert actions.shape == (self.n_planner, self.action_space), "Has shape {} but should have shape {}".format(actions.shape, (self.n_planner, self.action_space))
+        return actions
+    
+    def get_pred_trajectories(self, states, model, probabilistic): 
+        returns = np.zeros((self.n_planner, 1))
+
+        for i in range(self.horizon):
+            actions = self.sample_actions()
+            with torch.no_grad():
+
+                ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions)
+                ensemble_means[:, :, :-1] += states
+                ensemble_means = ensemble_means.mean(0)
+                ensemble_stds = np.sqrt(ensemble_stds).mean(0)
+                
+                if probabilistic:
+                    predictions = ensemble_means + np.random.normal(size=ensemble_means.shape) * ensemble_stds
+                else:
+                    predictions = ensemble_means
+
+            states = predictions[:, :-1]
+            
+            returns += predictions[:, -1][:, None]
+            if i == 0:
+                first_actions = actions
+
+        return first_actions, returns

@@ -9,7 +9,7 @@ from buffer import MBReplayBuffer
 import glob
 from utils import save, collect_random
 import random
-from MPC import MPC, CEM
+from MPC import MPC, CEM, PDDM
 from model import MBEnsemble
 from utils import evaluate
 from tqdm import tqdm
@@ -38,12 +38,18 @@ def get_config():
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem"], help="")
-    parser.add_argument("--n_planner", type=int, default=1000, help="") # 1000
+    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
+    parser.add_argument("--n_planner", type=int, default=10, help="") # 1000
     parser.add_argument("--depth", type=int, default=10, help="") # 30
+    parser.add_argument("--action_noise", type=int, default=0, help="")
+    # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=5, help="")
     parser.add_argument("--k_best", type=int, default=10, help="")
-    parser.add_argument("--action_noise", type=int, default=0, help="")
+    # pddm specific
+    parser.add_argument("--pddm_gamma", type=float, default=10, help="")
+    parser.add_argument("--pddm_beta", type=float, default=0.5, help="")
+
+    
 
     
     args = parser.parse_args()
@@ -77,6 +83,15 @@ def train(config):
                       iter_update_steps=config.iter_update_steps,
                       k_best=config.k_best,
                       device=device)
+        elif config.mpc_type == "pddm":
+            mpc = PDDM(action_space=evaluation_env.action_space,
+                       n_planner=config.n_planner,
+                       horizon=config.depth,
+                       gamma=config.pddm_gamma,
+                       beta=config.pddm_beta,
+                       device=device)
+        else:
+            raise NotImplementedError
         ensemble = MBEnsemble(state_size=state_size,
                               action_size=action_size,
                               config=config,
