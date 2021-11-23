@@ -38,11 +38,11 @@ def get_config():
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem"], help="")
-    parser.add_argument("--n_planner", type=int, default=5, help="") # 1000
-    parser.add_argument("--depth", type=int, default=3, help="") # 30
+    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem"], help="")
+    parser.add_argument("--n_planner", type=int, default=1000, help="") # 1000
+    parser.add_argument("--depth", type=int, default=10, help="") # 30
     parser.add_argument("--iter_update_steps", type=int, default=5, help="")
-    parser.add_argument("--k_best", type=int, default=2, help="")
+    parser.add_argument("--k_best", type=int, default=10, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
 
     
