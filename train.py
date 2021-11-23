@@ -27,20 +27,22 @@ def get_config():
     
     ## MB params
     parser.add_argument("--mb_buffer_size", type=int, default=100_000, help="")
-    parser.add_argument("--ensembles", type=int, default=5, help="")
+    parser.add_argument("--ensembles", type=int, default=1, help="")
     parser.add_argument("--probabilistic", type=int, default=1, help="")
-    parser.add_argument("--elite_size", type=int, default=3, help="")
+    parser.add_argument("--elite_size", type=int, default=1, help="")
     parser.add_argument("--hidden_size", type=int, default=200, help="")
+    parser.add_argument("--hidden_layer", type=int, default=3, help="")
     parser.add_argument("--mb_lr", type=float, default=1e-3, help="")
+    parser.add_argument("--loss_type", type=str, choices=["mse", "maximum_likelihood"], default="maximum_likelihood", help="")
     parser.add_argument("--update_frequency", type=int, default=250, help="")
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem"], help="")
-    parser.add_argument("--n_planner", type=int, default=500, help="") # 1000
-    parser.add_argument("--depth", type=int, default=30, help="") # 30
+    parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem"], help="")
+    parser.add_argument("--n_planner", type=int, default=5, help="") # 1000
+    parser.add_argument("--depth", type=int, default=3, help="") # 30
     parser.add_argument("--iter_update_steps", type=int, default=5, help="")
-    parser.add_argument("--k_best", type=int, default=4, help="")
+    parser.add_argument("--k_best", type=int, default=2, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
 
     
@@ -79,7 +81,7 @@ def train(config):
                               action_size=action_size,
                               config=config,
                               device=device)    
-                
+        print(ensemble.dynamics_model)
         mb_buffer = MBReplayBuffer(buffer_size=config.mb_buffer_size,
                                    device=device)
 
@@ -94,10 +96,10 @@ def train(config):
             while episode_steps < config.episode_length:
 
                 if steps % config.update_frequency == 0:
-                    train_loader, test_loader = mb_buffer.get_dataloader(batch_size=256)
-                    losses, trained_epochs = ensemble.train(train_loader, test_loader)           
+                    train_inputs, train_labels = mb_buffer.get_dataloader()
+                    losses, trained_epochs = ensemble.train(train_inputs, train_labels)           
                     wandb.log({"Episode": i, "MB mean loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
-                    tqdm.write("\nEpisode: {} | Ensemble losses: {}".format(i, losses))
+                    tqdm.write("\rEpisode: {} | Ensemble losses: {}".format(i, losses))
 
                 action = mpc.get_next_action(state, ensemble, noise=config.action_noise, probabilistic=config.probabilistic)
                 
@@ -114,7 +116,7 @@ def train(config):
             # do evaluation runs 
             rewards = evaluate(evaluation_env, mpc, ensemble)
             average10.append(rewards)
-            tqdm.write("\nEpisode: {} | Reward: {} | Steps: {}".format(i, rewards, steps,))
+            tqdm.write("\rEpisode: {} | Reward: {} | Steps: {}".format(i, rewards, steps,))
             
             wandb.log({"Reward": rewards,
                        "Average10": np.mean(average10),

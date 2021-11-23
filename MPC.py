@@ -40,8 +40,6 @@ class CEM():
         self.action_space = action_space.shape[0]
         self.horizon = horizon
         self.iter_update_steps = iter_update_steps
-        self.mu = np.zeros(self.action_space)
-        self.var = np.ones(self.action_space) # var = sigma² , sigma = std
         
     def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
         initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
@@ -159,3 +157,16 @@ class MPC():
                 first_actions = deepcopy(actions)
 
         return first_actions, returns
+
+
+class PDDM():
+    def __init__(self, action_space, n_planner=200, horizon=7, iter_update_steps=3, k_best=40, gamma=10, beta=0.5, device=None)-> None:
+        self.n_planner = n_planner
+        self.k_best = k_best
+        self.device = device
+        self.update_alpha = 0.25
+        self.action_space = action_space.shape[0]
+        self.horizon = horizon
+        self.iter_update_steps = iter_update_steps
+        self.gamma = gamma
+        self.beta = beta

@@ -5,7 +5,6 @@ from collections import deque, namedtuple
 from torch.utils.data import TensorDataset, DataLoader
 from operator import itemgetter
 
-
 class MBReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
@@ -40,22 +39,17 @@ class MBReplayBuffer:
 
         return (states, actions, rewards, next_states, dones)
 
-    def get_dataloader(self, batch_size=256, data_split=0.15):
-        states = torch.from_numpy(np.stack([e.state for e in self.memory if e is not None])).float().to(self.device)
-        actions = torch.from_numpy(np.vstack([e.action for e in self.memory if e is not None])).float().to(self.device)
-        rewards = torch.from_numpy(np.vstack([e.reward for e in self.memory if e is not None])).float().to(self.device)
-        next_states = torch.from_numpy(np.stack([e.next_state for e in self.memory if e is not None])).float().to(self.device)
-        dones = torch.from_numpy(np.vstack([e.done for e in self.memory if e is not None]).astype(np.uint8)).float().to(self.device)
-        dataset = TensorDataset(states, actions, rewards, next_states, dones)
-        test_size = int(len(dataset) * data_split)
-        train_size = len(dataset) - test_size
+    def get_dataloader(self ):
+        states = np.stack([e.state for e in self.memory if e is not None])
+        actions = np.vstack([e.action for e in self.memory if e is not None])
+        rewards = np.vstack([e.reward for e in self.memory if e is not None])
+        next_states = np.stack([e.next_state for e in self.memory if e is not None])
         
-        train_data, test_data = torch.utils.data.random_split(dataset, [train_size, test_size])
-        
-        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-        test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
-
-        return train_loader, test_loader
+        inputs = np.concatenate((states, actions), axis=-1)
+        delta_state = next_states - states
+        labels = np.concatenate((delta_state, rewards), axis=-1)
+                
+        return inputs, labels
     
     def return_all(self,):
         return self.memory
@@ -66,4 +60,3 @@ class MBReplayBuffer:
     def __len__(self):
         """Return the current size of internal memory."""
         return len(self.memory)
-
