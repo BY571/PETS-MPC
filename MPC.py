@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import torch
 from copy import copy, deepcopy
+import scipy.stats as stats
 
 
 class RandomPolicy():
@@ -41,16 +42,25 @@ class CEM():
         self.iter_update_steps = iter_update_steps
         self.update_alpha = 0.0
         self.epsilon = 0.001
+        self.ub = 1
+        self.lb = -1
         
     def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
         initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
         mu = np.zeros(self.horizon*self.action_space)
         var = 5 * np.ones(self.horizon*self.action_space)
+        X = stats.truncnorm(self.lb, self.ub, loc=np.zeros_like(mu), scale=np.ones_like(mu))
         t = 0
         while ((t < self.iter_update_steps) and (np.max(var) > self.epsilon)):
             states = initial_state
             reward_summed = np.zeros((self.n_planner, 1))
-            actions = np.random.normal(mu, np.sqrt(var), size=(self.n_planner, self.horizon*self.action_space))
+            #variables
+            lb_dist = mu - self.lb
+            ub_dist = self.ub - mu
+            constrained_var = np.minimum(
+                np.minimum(np.square(lb_dist / 2), np.square(ub_dist / 2)), var)
+            
+            actions = X.rvs(size=[self.N, self.sol_dim]) * np.sqrt(constrained_var) + mu
             actions_t = np.clip(actions, -1, 1).reshape(self.n_planner, self.horizon, self.action_space)
             for t in range(self.horizon):
                 with torch.no_grad():
