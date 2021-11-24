@@ -50,8 +50,8 @@ class CEM():
         mu = np.zeros(self.horizon*self.action_space)
         var = 5 * np.ones(self.horizon*self.action_space)
         X = stats.truncnorm(self.lb, self.ub, loc=np.zeros_like(mu), scale=np.ones_like(mu))
-        t = 0
-        while ((t < self.iter_update_steps) and (np.max(var) > self.epsilon)):
+        i = 0
+        while ((i < self.iter_update_steps) and (np.max(var) > self.epsilon)):
             states = initial_state
             reward_summed = np.zeros((self.n_planner, 1))
             #variables
@@ -78,7 +78,7 @@ class CEM():
             
             k_best_rewards, k_best_actions = self.select_k_best(reward_summed, actions)
             mu, var = self.update_gaussians(mu, var, k_best_actions)
-            t += 1
+            i += 1
         
         best_action_sequence = mu.reshape(self.horizon, -1)
         best_action = np.copy(best_action_sequence[-1])
