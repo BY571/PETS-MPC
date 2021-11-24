@@ -40,12 +40,14 @@ class CEM():
         self.action_space = action_space.shape[0]
         self.horizon = horizon
         self.iter_update_steps = iter_update_steps
+        self.epsilon = 0.001
         
     def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
         initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
         mu = np.zeros(self.action_space)
-        var = np.ones(self.action_space) # var = sigma² , sigma = std
-        for i in range(self.iter_update_steps):
+        var = 5 * np.ones(self.action_space) # var = sigma² , sigma = std
+        t = 0
+        while ((t < self.max_iters) and (np.max(var) > self.epsilon)):
 
             states = initial_state
             reward_summed = np.zeros((self.n_planner, 1))
@@ -71,6 +73,7 @@ class CEM():
             
             k_best_rewards, k_best_actions = self.select_k_best(reward_summed, action_history)
             mu, var = self.update_gaussians(mu, var, k_best_actions)
+            t += 1
         
         #best_action = k_best_actions[0, -1, :]#[None, :] # 0 element in the horizon, -1 best planner
         action = np.random.normal(mu, np.sqrt(var), size=(self.action_space, ))
@@ -96,12 +99,12 @@ class CEM():
     def update_gaussians(self, old_mu, old_var, best_actions):
         assert best_actions.shape == (self.horizon, self.k_best, self.action_space)
 
-        new_mu = best_actions[0].mean(0) # take first action in history
-        new_var = best_actions[0].var(0)  # take first action in history
+        new_mu = best_actions.mean(0).mean(0) # take first action in history
+        new_var = best_actions.var(0).var(0)  # take first action in history
 
-        mu = (self.update_alpha * old_mu + (1.0-self.update_alpha) * new_mu)
+        mu = (self.update_alpha * new_mu + (1.0-self.update_alpha) * old_mu)
         #print("old mu: {} new_mu: {} updated mu: {}".format(old_mu, new_mu, self.mu))
-        var = (self.update_alpha * old_var + (1.0 - self.update_alpha) * new_var)
+        var = (self.update_alpha * new_var + (1.0 - self.update_alpha) * old_var)
         return mu, var
 
 
@@ -185,6 +188,8 @@ class PDDM():
         return optimal_action
         
     def update_mu(self, actions, returns):
+        assert returns.shape == (self.n_planner, 1)
+        assert actions.shape == (self.n_planner, self.action_space)
         nenner = (np.exp(self.gamma * returns) * actions).sum(0)
 
         assert nenner.shape == (self.action_space,), "should be shape {} but has shape: {}".format(self.action_space, nenner.shape)
