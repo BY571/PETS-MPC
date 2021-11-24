@@ -39,14 +39,14 @@ def get_config():
 
     #MPC params
     parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
-    parser.add_argument("--n_planner", type=int, default=10, help="") # 1000
-    parser.add_argument("--depth", type=int, default=10, help="") # 30
+    parser.add_argument("--n_planner", type=int, default=700, help="") # 1000
+    parser.add_argument("--depth", type=int, default=12, help="") # 30
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
-    parser.add_argument("--iter_update_steps", type=int, default=5, help="")
-    parser.add_argument("--k_best", type=int, default=10, help="")
+    parser.add_argument("--iter_update_steps", type=int, default=3, help="")
+    parser.add_argument("--k_best", type=int, default=20, help="")
     # pddm specific
-    parser.add_argument("--pddm_gamma", type=float, default=10, help="")
+    parser.add_argument("--pddm_gamma", type=float, default=1.0, help="")
     parser.add_argument("--pddm_beta", type=float, default=0.5, help="")
 
     
