@@ -57,10 +57,9 @@ class CEM():
             #variables
             lb_dist = mu - self.lb
             ub_dist = self.ub - mu
-            constrained_var = np.minimum(
-                np.minimum(np.square(lb_dist / 2), np.square(ub_dist / 2)), var)
+            constrained_var = np.minimum(np.minimum(np.square(lb_dist / 2), np.square(ub_dist / 2)), var)
             
-            actions = X.rvs(size=[self.N, self.sol_dim]) * np.sqrt(constrained_var) + mu
+            actions = X.rvs(size=[self.n_planner, self.horizon*self.action_space]) * np.sqrt(constrained_var) + mu
             actions_t = np.clip(actions, -1, 1).reshape(self.n_planner, self.horizon, self.action_space)
             for t in range(self.horizon):
                 with torch.no_grad():
