@@ -44,19 +44,17 @@ class CEM():
         
     def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
         initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
-        mu = np.zeros(self.action_space)
-        var = 5 * np.ones(self.action_space) # var = sigma² , sigma = std
+        mu = np.zeros(self.horizon*self.action_space)
+        var = 5 * np.ones(self.horizon*self.action_space)
         t = 0
-        while ((t < self.max_iters) and (np.max(var) > self.epsilon)):
-
+        while ((t < self.iter_update_steps) and (np.max(var) > self.epsilon)):
             states = initial_state
             reward_summed = np.zeros((self.n_planner, 1))
-            action_history = []
-            for i in range(self.horizon):
-                actions = np.random.normal(mu, np.sqrt(var), size=(states.shape[0], self.action_space))
-
+            actions = np.random.normal(mu, np.sqrt(var), size=(self.n_planner, self.horizon*self.action_space))
+            actions_t = np.clip(actions, -1, 1).reshape(self.n_planner, self.horizon, self.action_space)
+            for t in range(self.horizon):
                 with torch.no_grad():
-                    ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions)
+                    ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions_t[:, t, :])
                     ensemble_means[:, :, :-1] += states
                     ensemble_means = ensemble_means.mean(0)
                     ensemble_stds = np.sqrt(ensemble_stds).mean(0)
@@ -67,44 +65,40 @@ class CEM():
                         predictions = ensemble_means
 
                 states = predictions[:, :-1]
-
                 reward_summed += predictions[:, -1][:, None]
-                action_history.append(actions[None, :]) # shape (horizon, n_planner, action_space)
             
-            k_best_rewards, k_best_actions = self.select_k_best(reward_summed, action_history)
+            k_best_rewards, k_best_actions = self.select_k_best(reward_summed, actions)
             mu, var = self.update_gaussians(mu, var, k_best_actions)
             t += 1
         
-        #best_action = k_best_actions[0, -1, :]#[None, :] # 0 element in the horizon, -1 best planner
-        action = np.random.normal(mu, np.sqrt(var), size=(self.action_space, ))
-        assert action.shape == (self.action_space,)
-        return action
+        best_action_sequence = mu.reshape(self.horizon, -1)
+        best_action = np.copy(best_action_sequence[-1])
+        assert best_action.shape == (self.action_space,)
+        return best_action
             
     
     def select_k_best(self, rewards, action_hist):
         assert rewards.shape == (self.n_planner, 1)
         idxs = np.argsort(rewards, axis=0)
-        action_hist = np.concatenate(action_hist) # shape (horizon, n_planner, action_space)
 
-        sorted_actions_hist = action_hist[:, idxs, :].squeeze(2) # sorted (horizon, n_planner, action_space)
-
-        k_best_actions_hist = sorted_actions_hist[:, -self.k_best:, :]
-        k_best_rewards = rewards[idxs].squeeze(1)[-self.k_best:]
+        elite_actions = action_hist[idxs][-self.k_best:, :].squeeze(1) # sorted (elite, horizon x action_space)
+        k_best_rewards = rewards[idxs][-self.k_best:, :].squeeze(-1)
 
         assert k_best_rewards.shape == (self.k_best, 1)
-        assert k_best_actions_hist.shape == (self.horizon, self.k_best, self.action_space)
-        return k_best_rewards, k_best_actions_hist
+        assert elite_actions.shape == (self.k_best, self.horizon*self.action_space)
+        return k_best_rewards, elite_actions
 
 
     def update_gaussians(self, old_mu, old_var, best_actions):
-        assert best_actions.shape == (self.horizon, self.k_best, self.action_space)
+        assert best_actions.shape == (self.k_best, self.horizon*self.action_space)
 
-        new_mu = best_actions[0].mean(0) # take first action in history
-        new_var = best_actions[0].var(0)  # take first action in history
+        new_mu = best_actions.mean(0)
+        new_var = best_actions.var(0)
 
-        mu = (self.update_alpha * new_mu + (1.0-self.update_alpha) * old_mu)
-        #print("old mu: {} new_mu: {} updated mu: {}".format(old_mu, new_mu, self.mu))
-        var = (self.update_alpha * new_var + (1.0 - self.update_alpha) * old_var)
+        mu = (self.update_alpha * old_mu + (1.0 - self.update_alpha) * new_mu)
+        var = (self.update_alpha * old_var + (1.0 - self.update_alpha) * new_var)
+        assert mu.shape == (self.horizon*self.action_space, )
+        assert var.shape == (self.horizon*self.action_space, )
         return mu, var
 
 

@@ -38,13 +38,13 @@ def get_config():
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="pddm", choices=["random", "cem", "pddm"], help="")
-    parser.add_argument("--n_planner", type=int, default=700, help="") # 1000
-    parser.add_argument("--depth", type=int, default=7, help="") # 30
+    parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem", "pddm"], help="")
+    parser.add_argument("--n_planner", type=int, default=500, help="") # 1000
+    parser.add_argument("--depth", type=int, default=30, help="") # 30
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=3, help="")
-    parser.add_argument("--k_best", type=int, default=20, help="")
+    parser.add_argument("--k_best", type=int, default=5, help="")
     # pddm specific
     parser.add_argument("--pddm_gamma", type=float, default=1.0, help="")
     parser.add_argument("--pddm_beta", type=float, default=0.5, help="")
