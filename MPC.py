@@ -166,59 +166,60 @@ class PDDM():
     def __init__(self, action_space, n_planner=200, horizon=7, gamma=10, beta=0.5, device=None)-> None:
         self.n_planner = n_planner
         self.device = device
-        self.update_alpha = 0.25
         self.action_space = action_space.shape[0]
         self.horizon = horizon
         self.gamma = gamma
         self.beta = beta
-        self.mu = np.zeros(self.action_space)
-        self.n = np.zeros(self.n_planner)
+        self.mu = np.zeros((self.horizon, self.action_space))
         
     def get_next_action(self, initial_state, model, noise=False, probabilistic=True):
-        print("current mu: ", self.mu, "\ncurrent n", self.n)
-        print("init_state type", type(initial_state))
         initial_state = np.repeat(initial_state[None, :], self.n_planner, 0)
-        first_actions, action_history, returns = self.get_pred_trajectories(initial_state, model, probabilistic)
-        
-        optimal_action = first_actions[returns.argmax()]
+        actions, returns = self.get_pred_trajectories(initial_state, model, probabilistic)
+        optimal_action = self.update_mu(actions, returns)
+       
         if noise:
             optimal_action += np.random.normal(0, 0.005, size=optimal_action.shape)
-
-        self.update_mu(action_history, returns)
         return optimal_action
         
     def update_mu(self, action_hist, returns):
-        action_hist = np.concatenate(action_hist) # shape (horizon, n_planner, action_space)
-        assert action_hist.shape == (self.horizon, self.n_planner, self.action_space)
+        assert action_hist.shape == (self.n_planner, self.horizon, self.action_space)
         assert returns.shape == (self.n_planner, 1)
 
         c = np.exp(self.gamma * (returns) -np.max(returns))
         d = np.sum(c) + 1e-10
         assert c.shape == (self.n_planner, 1)
-        assert d.shape == (1, ), "Has shape {}".format(d.shape)
-        c_expanded = c[None, :, :]
-        assert c_expanded.shape == (1, self.n_planner, 1)
+        assert d.shape == (), "Has shape {}".format(d.shape)
+        c_expanded = c[:, :, None]
+        assert c_expanded.shape == (self.n_planner, 1, 1)
         weighted_actions = c_expanded * action_hist
-        c = weighted_actions.sum(1)
-        assert c.shape == (self.horizon, self.action_space)
-        self.mu = c / d
+        self.mu = weighted_actions.sum(0) / d
+        assert self.mu.shape == (self.horizon, self.action_space)       
+        
+        return self.mu[0]
     
-    def sample_actions(self, ):
+    def sample_actions(self, past_action):
         u = np.random.normal(loc=0, scale=1.0, size=(self.n_planner, self.horizon, self.action_space))
-        self.n = self.beta * u + (1 - self.beta) * deepcopy(self.n)
-        assert self.n.shape == (self.n_planner, )
-        actions = self.mu + self.n[:, None]
-        assert actions.shape == (self.n_planner, self.action_space), "Has shape {} but should have shape {}".format(actions.shape, (self.n_planner, self.action_space))
+        actions = u.copy()
+        for t in range(self.horizon):
+            if t == 0:
+                actions[:, t, :] = self.beta * (self.mu[t, :] + u[:, t, :]) + (1 - self.beta) * past_action
+            else:
+                actions[:, t, :] = self.beta * (self.mu[t, :] + u[:, t, :]) + (1 - self.beta) * actions[:, t-1, :]
+        assert actions.shape == (self.n_planner, self.horizon, self.action_space), "Has shape {} but should have shape {}".format(actions.shape, (self.n_planner, self.horizon, self.action_space))
+        actions = np.clip(actions, -1, 1)
         return actions
     
     def get_pred_trajectories(self, states, model, probabilistic): 
         returns = np.zeros((self.n_planner, 1))
-        action_history = []
-        for i in range(self.horizon):
-            actions = self.sample_actions()
-            with torch.no_grad():
 
-                ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions)
+        np.random.seed()
+        past_action = self.mu[0].copy()
+        actions = self.sample_actions(past_action)
+        for t in range(self.horizon):
+            with torch.no_grad():
+                actions_t = actions[:, t, :]
+                assert actions_t.shape == (self.n_planner, self.action_space)
+                ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions_t)
                 ensemble_means[:, :, :-1] += states
                 ensemble_means = ensemble_means.mean(0)
                 ensemble_stds = np.sqrt(ensemble_stds).mean(0)
@@ -229,10 +230,5 @@ class PDDM():
                     predictions = ensemble_means
 
             states = predictions[:, :-1]
-            
             returns += predictions[:, -1][:, None]
-            action_history.append(actions[None, :]) # shape (horizon, n_planner, action_space)
-            if i == 0:
-                first_actions = actions
-
-        return first_actions, action_history, returns
+        return actions, returns

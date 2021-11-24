@@ -27,20 +27,20 @@ def get_config():
     
     ## MB params
     parser.add_argument("--mb_buffer_size", type=int, default=100_000, help="")
-    parser.add_argument("--ensembles", type=int, default=1, help="")
+    parser.add_argument("--ensembles", type=int, default=7, help="")
     parser.add_argument("--probabilistic", type=int, default=1, help="")
-    parser.add_argument("--elite_size", type=int, default=1, help="")
+    parser.add_argument("--elite_size", type=int, default=5, help="")
     parser.add_argument("--hidden_size", type=int, default=200, help="")
-    parser.add_argument("--hidden_layer", type=int, default=3, help="")
+    parser.add_argument("--hidden_layer", type=int, default=2, help="")
     parser.add_argument("--mb_lr", type=float, default=1e-3, help="")
     parser.add_argument("--loss_type", type=str, choices=["mse", "maximum_likelihood"], default="maximum_likelihood", help="")
     parser.add_argument("--update_frequency", type=int, default=250, help="")
     parser.add_argument("--rollout_select", type=str, default="random", choices=["random", "mean"], help="Define how the rollouts are composed, randomly from a random selected member of the ensemble or as the mean over all ensembles, default: random")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
+    parser.add_argument("--mpc_type", type=str, default="pddm", choices=["random", "cem", "pddm"], help="")
     parser.add_argument("--n_planner", type=int, default=700, help="") # 1000
-    parser.add_argument("--depth", type=int, default=12, help="") # 30
+    parser.add_argument("--depth", type=int, default=7, help="") # 30
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=3, help="")
