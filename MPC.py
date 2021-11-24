@@ -99,8 +99,8 @@ class CEM():
     def update_gaussians(self, old_mu, old_var, best_actions):
         assert best_actions.shape == (self.horizon, self.k_best, self.action_space)
 
-        new_mu = best_actions.mean(0).mean(0) # take first action in history
-        new_var = best_actions.var(0).var(0)  # take first action in history
+        new_mu = best_actions[0].mean(0) # take first action in history
+        new_var = best_actions[0].var(0)  # take first action in history
 
         mu = (self.update_alpha * new_mu + (1.0-self.update_alpha) * old_mu)
         #print("old mu: {} new_mu: {} updated mu: {}".format(old_mu, new_mu, self.mu))
