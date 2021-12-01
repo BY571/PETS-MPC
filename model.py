@@ -74,7 +74,9 @@ class DynamicsModel(nn.Module):
         prediction = torch.normal(mu, log_std.exp())
         assert prediction.shape == targets.shape
         if not validate:
-            loss = ((targets - prediction)**2).mean() #mean(-1).mean(-1).sum()
+            log_var = ((log_std.exp())**2).log()
+            inv_var = (-log_var).exp()
+            loss = ((targets - prediction)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
             return loss
         else:
             loss = ((targets - prediction)**2).mean(-1).mean(-1)
