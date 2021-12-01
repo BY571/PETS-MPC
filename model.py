@@ -54,8 +54,6 @@ class DynamicsModel(nn.Module):
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         self.loss_type = loss_type
-        if loss_type == "mse":
-            self.loss_f = nn.MSELoss(reduction='none')
         
     def forward(self, x, return_log_var=False):
         x = self.input_layer(x)
@@ -74,27 +72,17 @@ class DynamicsModel(nn.Module):
     def calc_loss(self, inputs, targets, validate=False):
         mu, log_var = self(inputs, return_log_var=True)
         assert mu.shape[1:] == targets.shape[1:]
-        if self.loss_type == "maximum_likelihood":
-            if not validate:
-                inv_var = (-log_var).exp()
-                loss = ((mu - targets)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
-                return loss
-            else:
-                return ((mu - targets)**2).mean(-1).mean(-1)
+
+        if not validate:
+            inv_var = (-log_var).exp()
+            loss = ((mu - targets)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
+            return loss
         else:
-            prediction = torch.normal(mu, torch.sqrt(torch.exp(log_var)))
-            assert prediction.shape == targets.shape
-            if not validate:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1).sum()
-                return loss
-            else:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1)
-                return loss
+            return ((mu - targets)**2).mean(-1).mean(-1)
 
     def optimize(self, loss):
         self.optimizer.zero_grad()
-        if self.loss_type == "maximum_likelihood":
-            loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
+        loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
         loss.backward()
         self.optimizer.step()
        
@@ -155,7 +143,7 @@ class MBEnsemble():
                 train_label = torch.from_numpy(train_label).float().to(self.device)
                 loss = self.dynamics_model.calc_loss(train_input, train_label)
                 self.dynamics_model.optimize(loss)
-                epochs_trained += 1
+            epochs_trained += 1
                 
             # evaluation
             self.dynamics_model.eval()
@@ -170,7 +158,7 @@ class MBEnsemble():
             
         assert len(val_losses) == self.n_ensembles, f"epoch_losses: {len(val_losses)} =/= {self.n_ensembles}"
         
-        return val_losses, np.mean(epochs_trained)
+        return loss.detach(), val_losses, np.mean(epochs_trained)
     
     def test_break_condition(self, current_losses):
         keep_train = False
