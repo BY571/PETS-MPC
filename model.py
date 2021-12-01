@@ -74,10 +74,10 @@ class DynamicsModel(nn.Module):
         prediction = torch.normal(mu, log_std.exp())
         assert prediction.shape == targets.shape
         if not validate:
-            loss = self.loss_f(prediction, targets).mean() #mean(-1).mean(-1).sum()
+            loss = ((targets - prediction)**2).mean() #mean(-1).mean(-1).sum()
             return loss
         else:
-            loss = self.loss_f(prediction, targets).mean(-1).mean(-1)
+            loss = ((targets - prediction)**2).mean(-1).mean(-1)
             return loss
 
     def optimize(self, loss):
