@@ -66,6 +66,9 @@ class DynamicsModel(nn.Module):
         return mu, log_std
     
     def calc_loss(self, inputs, targets, validate=False):
+        # inputs cat(state, action) 
+        # targets cat(delta state, reward)
+        # both with shape [ensemble, batch, feature size]
         mu, log_std = self(inputs)
         assert mu.shape[1:] == targets.shape[1:]
         prediction = torch.normal(mu, log_std.exp())
@@ -110,6 +113,8 @@ class MBEnsemble():
         self.env_name = config.env
         
     def train(self, inputs, labels):
+        # inputs cat(state, action)
+        # labels cat(delta state, reward)
         losses = 0
         epochs_trained = 0
         self.break_counter = 0
@@ -137,7 +142,7 @@ class MBEnsemble():
                 train_label = torch.from_numpy(train_label).float().to(self.device)
                 loss = self.dynamics_model.calc_loss(train_input, train_label)
                 self.dynamics_model.optimize(loss)
-                epochs_trained += 1
+            epochs_trained += 1
                 
             # evaluation
             self.dynamics_model.eval()
@@ -152,7 +157,7 @@ class MBEnsemble():
             
         assert len(val_losses) == self.n_ensembles, f"epoch_losses: {len(val_losses)} =/= {self.n_ensembles}"
         
-        return val_losses, np.mean(epochs_trained)
+        return loss.item(), val_losses, np.mean(epochs_trained)
     
     def test_break_condition(self, current_losses):
         keep_train = False
@@ -180,11 +185,11 @@ class MBEnsemble():
         inputs = torch.cat((states, actions), axis=-1).to(self.device)
         inputs = inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
         with torch.no_grad():
-            mus, var = self.dynamics_model(inputs)
+            mus, log_std = self.dynamics_model(inputs)
 
         # [ensembles, batch, prediction_shape]
         assert mus.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
-        assert var.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
-        return mus.cpu().numpy(), var.cpu().numpy()
+        assert log_std.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
+        return mus.cpu().numpy(), log_std.cpu().numpy()
             
     

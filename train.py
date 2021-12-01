@@ -112,9 +112,9 @@ def train(config):
 
                 if steps % config.update_frequency == 0:
                     train_inputs, train_labels = mb_buffer.get_dataloader()
-                    losses, trained_epochs = ensemble.train(train_inputs, train_labels)           
-                    wandb.log({"Episode": i, "MB mean loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
-                    tqdm.write("\rEpisode: {} | Ensemble losses: {}".format(i, losses))
+                    train_loss, losses, trained_epochs = ensemble.train(train_inputs, train_labels)           
+                    wandb.log({"Episode": i, "MB train loss": train_loss, "MB validation loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
+                    tqdm.write("\rEpisode: {} <| Train loss: {} | Ensemble losses: {}".format(i, train_loss, losses))
 
                 action = mpc.get_next_action(state, ensemble, noise=config.action_noise, probabilistic=config.probabilistic)
                 
