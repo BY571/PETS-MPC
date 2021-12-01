@@ -64,12 +64,14 @@ def train(config):
     torch.manual_seed(config.seed)
 
 
-    task = generate_task(task_generator_id=config.env_task)
-    env = CausalWorld(task=task)
-    evaluation_env = CausalWorld(task=task)
-    env.seed(config.seed)
-    evaluation_env.seed(config.seed)
-    
+    task = generate_task(task_generator_id=config.env_task,
+                         dense_reward_weights=np.array([750, 250, 0]),
+                         variables_space='space_a',
+                         fractional_reward_weight=1)
+
+    env = CausalWorld(task=task,seed=config.seed, enable_visualization=False, skip_frame=3)
+    evaluation_env = CausalWorld(task=task,seed=config.seed + 123, enable_visualization=False, skip_frame=3)
+
     state_size = evaluation_env.observation_space.shape[0]
     action_size = evaluation_env.action_space.shape[0]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

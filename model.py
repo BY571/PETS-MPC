@@ -125,7 +125,7 @@ class MBEnsemble():
         self._current_best = [1e10 for i in range(self.n_ensembles)]
         self.improvement_threshold = 0.01
         self.break_counter = 0
-        self.env_name = config.env
+
         
     def train(self, inputs, labels):
         losses = 0
