@@ -61,7 +61,7 @@ class DynamicsModel(nn.Module):
     
         mu = self.mu(x)
         log_std = self.log_std(x)
-        log_std = torch.clamp(log_std, self.min_logstd, self.max_logstd)
+        log_std = torch.clamp(log_std, -10, 2)
 
         return mu, log_std
     
