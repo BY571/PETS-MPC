@@ -180,7 +180,7 @@ class MBEnsemble():
         inputs = torch.cat((states, actions), axis=-1).to(self.device)
         inputs = inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
         with torch.no_grad():
-            mus, var = self.dynamics_model(inputs, return_log_var=False)
+            mus, var = self.dynamics_model(inputs)
 
         # [ensembles, batch, prediction_shape]
         assert mus.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
