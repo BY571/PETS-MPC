@@ -66,7 +66,7 @@ class CEM():
                     ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions_t[:, t, :])
                     ensemble_means[:, :, :-1] += states
                     ensemble_means = ensemble_means.mean(0)
-                    ensemble_stds = np.sqrt(ensemble_stds).mean(0)
+                    ensemble_stds = ensemble_stds.exp().mean(0)
                     
                     if probabilistic:
                         predictions = ensemble_means + np.random.normal(size=ensemble_means.shape) * ensemble_stds
@@ -149,7 +149,7 @@ class MPC():
                 ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions)
                 ensemble_means[:, :, :-1] += states
                 ensemble_means = ensemble_means.mean(0)
-                ensemble_stds = np.sqrt(ensemble_stds).mean(0)
+                ensemble_stds = ensemble_stds.exp().mean(0)
                 
                 if probabilistic:
                     predictions = ensemble_means + np.random.normal(size=ensemble_means.shape) * ensemble_stds
@@ -225,7 +225,7 @@ class PDDM():
                 ensemble_means, ensemble_stds = model.run_ensemble_prediction(states, actions_t)
                 ensemble_means[:, :, :-1] += states
                 ensemble_means = ensemble_means.mean(0)
-                ensemble_stds = np.sqrt(ensemble_stds).mean(0)
+                ensemble_stds = ensemble_stds.exp().mean(0)
                 
                 if probabilistic:
                     predictions = ensemble_means + np.random.normal(size=ensemble_means.shape) * ensemble_stds

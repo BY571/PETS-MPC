@@ -34,67 +34,51 @@ class Ensemble_FC_Layer(nn.Module):
     
 class DynamicsModel(nn.Module):
 
-    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, loss_type="mse", device="cpu"):
+    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, device="cpu"):
         super(DynamicsModel, self).__init__()
         self.ensemble_size = ensemble_size
+        activation = nn.SiLU() # nn.RELU()
         self.input_layer = Ensemble_FC_Layer(state_size + action_size, hidden_size, ensemble_size)
         hidden_layers = []
-        hidden_layers.append(nn.SiLU())
+        hidden_layers.append(activation)
         for _ in range(hidden_layer):
             hidden_layers.append(Ensemble_FC_Layer(hidden_size, hidden_size, ensemble_size))
-            hidden_layers.append(nn.SiLU())
+            hidden_layers.append(activation)
         self.hidden_layers = nn.Sequential(*hidden_layers)
  
         self.mu = Ensemble_FC_Layer(hidden_size, state_size + 1, ensemble_size)
-        self.log_var = Ensemble_FC_Layer(hidden_size, state_size + 1, ensemble_size)
-        
+        self.log_std = Ensemble_FC_Layer(hidden_size, state_size + 1, ensemble_size)
 
-        self.min_logvar = nn.Parameter((-torch.ones((1, state_size + 1)).float() * 10).to(device), requires_grad=False)
-        self.max_logvar = nn.Parameter((torch.ones((1, state_size + 1)).float() / 2).to(device), requires_grad=False)
+        self.min_logstd = (- torch.ones((1, state_size + 1)).float() * 10).to(device)
+        self.max_logstd = (torch.ones((1, state_size + 1)).float() * 2).to(device)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        self.loss_type = loss_type
-        if loss_type == "mse":
-            self.loss_f = nn.MSELoss(reduction='none')
+        self.loss_f = nn.MSELoss(reduction='none')
         
-    def forward(self, x, return_log_var=False):
+    def forward(self, x):
         x = self.input_layer(x)
         x = self.hidden_layers(x)
     
         mu = self.mu(x)
+        log_std = self.log_std(x)
+        log_std = torch.clamp(log_std, self.min_logstd, self.max_logstd)
 
-        log_var = self.max_logvar - F.softplus(self.max_logvar - self.log_var(x))
-        log_var = self.min_logvar + F.softplus(log_var - self.min_logvar)
-
-        if return_log_var:
-            return mu, log_var
-        else:
-            return mu, torch.exp(log_var)
+        return mu, log_std
     
     def calc_loss(self, inputs, targets, validate=False):
-        mu, log_var = self(inputs, return_log_var=True)
+        mu, log_std = self(inputs)
         assert mu.shape[1:] == targets.shape[1:]
-        if self.loss_type == "maximum_likelihood":
-            if not validate:
-                inv_var = (-log_var).exp()
-                loss = ((mu - targets)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
-                return loss
-            else:
-                return ((mu - targets)**2).mean(-1).mean(-1)
+        prediction = torch.normal(mu, log_std.exp())
+        assert prediction.shape == targets.shape
+        if not validate:
+            loss = self.loss_f(prediction, targets).mean() #mean(-1).mean(-1).sum()
+            return loss
         else:
-            prediction = torch.normal(mu, torch.sqrt(torch.exp(log_var)))
-            assert prediction.shape == targets.shape
-            if not validate:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1).sum()
-                return loss
-            else:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1)
-                return loss
+            loss = self.loss_f(prediction, targets).mean(-1).mean(-1)
+            return loss
 
     def optimize(self, loss):
         self.optimizer.zero_grad()
-        if self.loss_type == "maximum_likelihood":
-            loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
         loss.backward()
         self.optimizer.step()
        
@@ -114,10 +98,8 @@ class MBEnsemble():
                                       hidden_layer=config.hidden_layer,
                                       hidden_size=config.hidden_size,
                                       lr=config.mb_lr,
-                                      loss_type=config.loss_type,
                                       device=device).to(device)
 
-        self.rollout_select = config.rollout_select
         self.elite_size = config.elite_size
         self.elite_idxs = []
         
