@@ -46,10 +46,10 @@ class RandomShooting(MPC):
         actions = np.random.uniform(low=self.action_low,
                                     high=self.action_high,
                                     size=(self.n_planner, self.horizon, self.action_space))
-        return torch.from_numpy(actions).to(self.device)
+        return torch.from_numpy(actions).to(self.device).float()
     
     def get_action(self, state: torch.Tensor, model: torch.nn.Module, noise: bool=False)-> torch.Tensor:
-
+        state = torch.from_numpy(state[None, :]).float()
         initial_states = state.repeat((self.n_planner, 1)).to(self.device)
         rollout_actions = self.get_rollout_actions()
         returns = self.compute_returns(initial_states, rollout_actions, model)
@@ -58,7 +58,7 @@ class RandomShooting(MPC):
         if noise and self.action_type=="continuous":
             optimal_action += torch.normal(torch.zeros(optimal_action.shape),
                                            torch.ones(optimal_action.shape) * 0.005).to(self.device)
-        return optimal_action
+        return optimal_action.cpu().numpy()
 
 
     def compute_returns(self, states: torch.Tensor, actions: torch.Tensor, model: torch.nn.Module)-> Tuple[torch.Tensor]:
@@ -83,7 +83,7 @@ class CEM(MPC):
         self.device = device
         
     def get_action(self, state, model, noise=False):
-        initial_state = state.repeat(self.n_planner, 1).to(self.device)
+        initial_state = state.repeat((self.n_planner, 1)).to(self.device)
         mu = np.zeros(self.horizon*self.action_space)
         var = 5 * np.ones(self.horizon*self.action_space)
         X = stats.truncnorm(self.lb, self.ub, loc=np.zeros_like(mu), scale=np.ones_like(mu))

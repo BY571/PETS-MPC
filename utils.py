@@ -34,7 +34,7 @@ def evaluate(env, mpc, model, eval_runs=5):
 
         rewards = 0
         while True:
-            action = mpc.get_next_action(state, model, noise=False)
+            action = mpc.get_action(state, model, noise=False)
             state, reward, done, _ = env.step(action)
             rewards += reward
             if done:

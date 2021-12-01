@@ -34,7 +34,7 @@ class Ensemble_FC_Layer(nn.Module):
     
 class DynamicsModel(nn.Module):
 
-    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, loss_type="mse", device="cpu"):
+    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, device="cpu"):
         super(DynamicsModel, self).__init__()
         self.ensemble_size = ensemble_size
         self.input_layer = Ensemble_FC_Layer(state_size + action_size, hidden_size, ensemble_size)
@@ -53,7 +53,6 @@ class DynamicsModel(nn.Module):
         self.max_logvar = nn.Parameter((torch.ones((1, state_size + 1)).float() / 2).to(device), requires_grad=False)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        self.loss_type = loss_type
         
     def forward(self, x, return_log_var=False):
         x = self.input_layer(x)
@@ -92,7 +91,6 @@ class MBEnsemble():
                 
         self.device = device
         self.ensemble = []
-        self.probabilistic = True
         self.batch_size = config.batch_size
         self.validation_percentage = 0.2
         self.n_ensembles = config.ensembles
@@ -102,12 +100,12 @@ class MBEnsemble():
                                       hidden_layer=config.hidden_layer,
                                       hidden_size=config.hidden_size,
                                       lr=config.mb_lr,
-                                      loss_type=config.loss_type,
                                       device=device).to(device)
 
-        self.rollout_select = config.rollout_select
+
         self.elite_size = config.elite_size
         self.elite_idxs = []
+        self.dynamics_type = config.dynamics_type
         
         self.max_not_improvements = 5
         self._current_best = [1e10 for i in range(self.n_ensembles)]
