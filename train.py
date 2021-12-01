@@ -9,7 +9,7 @@ from buffer import MBReplayBuffer
 import glob
 from utils import save, collect_random
 import random
-from MPC import MPC, CEM, PDDM
+from MPC import RandomShooting, CEM, PDDM
 from model import MBEnsemble
 from utils import evaluate
 from tqdm import tqdm
@@ -40,7 +40,7 @@ def get_config():
     #MPC params
     parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem", "pddm"], help="")
     parser.add_argument("--n_planner", type=int, default=500, help="") # 1000
-    parser.add_argument("--depth", type=int, default=30, help="") # 30
+    parser.add_argument("--horizon", type=int, default=30, help="") # 30
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=3, help="")
@@ -75,20 +75,16 @@ def train(config):
     with wandb.init(project="PETS", name=config.run_name, config=config):
         
         if config.mpc_type == "random":
-            mpc = MPC(evaluation_env.action_space, n_planner=config.n_planner, depth=config.depth, device=device)
+            mpc = RandomShooting(evaluation_env.action_space,
+                      config=config,
+                      device=device)
         elif config.mpc_type == "cem":
             mpc = CEM(action_space=evaluation_env.action_space,
-                      n_planner=config.n_planner,
-                      horizon=config.depth,
-                      iter_update_steps=config.iter_update_steps,
-                      k_best=config.k_best,
+                      config=config,
                       device=device)
         elif config.mpc_type == "pddm":
             mpc = PDDM(action_space=evaluation_env.action_space,
-                       n_planner=config.n_planner,
-                       horizon=config.depth,
-                       gamma=config.pddm_gamma,
-                       beta=config.pddm_beta,
+                       config=config,
                        device=device)
         else:
             raise NotImplementedError
@@ -116,7 +112,7 @@ def train(config):
                     wandb.log({"Episode": i, "Train loss": train_loss.item(), "MB validation loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
                     tqdm.write("\rEpisode: {} | Ensemble losses: {}".format(i, losses))
 
-                action = mpc.get_next_action(state, ensemble, noise=config.action_noise, probabilistic=config.probabilistic)
+                action = mpc.get_action(state, ensemble, noise=config.action_noise, probabilistic=config.probabilistic)
                 
                 next_state, reward, done, _ = env.step(action)
 

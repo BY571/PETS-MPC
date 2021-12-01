@@ -181,8 +181,6 @@ class MBEnsemble():
 
 
     def run_ensemble_prediction(self, states, actions):
-        states = torch.from_numpy(states).float()
-        actions = torch.from_numpy(actions).float()
         inputs = torch.cat((states, actions), axis=-1).to(self.device)
         inputs = inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
         with torch.no_grad():
@@ -191,6 +189,22 @@ class MBEnsemble():
         # [ensembles, batch, prediction_shape]
         assert mus.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
         assert var.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
-        return mus.cpu().numpy(), var.cpu().numpy()
+        
+        mus[:, :, :-1] += states.to(self.device)
+        mus = mus.mean(0)
+        std = torch.sqrt(var).mean(0)
+
+        if self.dynamics_type == "probabilistic":
+            predictions = torch.normal(mean=mus, std=std)
+        else:
+            predictions = mus
+
+        assert predictions.shape == (states.shape[0], states.shape[1] + 1)
+
+        next_states = predictions[:, :-1]
+        # TODO: add selection between given reward function or learned one
+        rewards = predictions[:, -1].unsqueeze(-1)
+        # TODO: add Termination function?
+        return next_states, rewards
             
     
