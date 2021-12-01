@@ -19,7 +19,7 @@ from causal_world.task_generators import generate_task
 def get_config():
     parser = argparse.ArgumentParser(description='RL')
     parser.add_argument("--run_name", type=str, default="PETS-MPC", help="Run name, default: PETS-MPC")
-    parser.add_argument("--env", type=str, default="Pendulum-v1", help="Gym environment name, default: Pendulum-v0")
+    parser.add_argument("--env_task", type=str, default="pushing", help="Causal world env task")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes, default: 100")
     parser.add_argument("--episode_length", type=int, default=500, help="Length of one episode, default: 1000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
@@ -64,7 +64,7 @@ def train(config):
     torch.manual_seed(config.seed)
 
 
-    task = generate_task(task_generator_id='pushing')
+    task = generate_task(task_generator_id=config.env_task)
     env = CausalWorld(task=task)
     evaluation_env = CausalWorld(task=task)
     env.seed(config.seed)
@@ -77,7 +77,7 @@ def train(config):
     steps = 0
     average10 = deque(maxlen=10)
     
-    with wandb.init(project="PETS", name=config.run_name, config=config):
+    with wandb.init(project="CAUSAL_WORLD_MB", name=config.run_name, config=config):
         
         if config.mpc_type == "random":
             mpc = MPC(evaluation_env.action_space, n_planner=config.n_planner, depth=config.depth, device=device)
