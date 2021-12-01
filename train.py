@@ -13,6 +13,8 @@ from MPC import MPC, CEM, PDDM
 from model import MBEnsemble
 from utils import evaluate
 from tqdm import tqdm
+from causal_world.envs import CausalWorld
+from causal_world.task_generators import generate_task
 
 def get_config():
     parser = argparse.ArgumentParser(description='RL')
@@ -60,8 +62,11 @@ def train(config):
     np.random.seed(config.seed)
     random.seed(config.seed)
     torch.manual_seed(config.seed)
-    env = gym.make(config.env)
-    evaluation_env = gym.make(config.env)
+
+
+    task = generate_task(task_generator_id='pushing')
+    env = CausalWorld(task=task)
+    evaluation_env = CausalWorld(task=task)
     env.seed(config.seed)
     evaluation_env.seed(config.seed)
     
