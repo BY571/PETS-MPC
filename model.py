@@ -34,7 +34,7 @@ class Ensemble_FC_Layer(nn.Module):
     
 class DynamicsModel(nn.Module):
 
-    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, loss_type="mse", device="cpu"):
+    def __init__(self, state_size, action_size, ensemble_size=7, hidden_layer=3, hidden_size=200, lr=1e-2, device="cpu"):
         super(DynamicsModel, self).__init__()
         self.ensemble_size = ensemble_size
         self.input_layer = Ensemble_FC_Layer(state_size + action_size, hidden_size, ensemble_size)
@@ -49,13 +49,10 @@ class DynamicsModel(nn.Module):
         self.log_var = Ensemble_FC_Layer(hidden_size, state_size + 1, ensemble_size)
         
 
-        self.min_logvar = nn.Parameter((-torch.ones((1, state_size + 1)).float() * 10).to(device), requires_grad=False)
-        self.max_logvar = nn.Parameter((torch.ones((1, state_size + 1)).float() / 2).to(device), requires_grad=False)
+        self.min_logvar = (-torch.ones((1, state_size + 1)).float() * 10).to(device)
+        self.max_logvar = (torch.ones((1, state_size + 1)).float() / 2).to(device)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        self.loss_type = loss_type
-        if loss_type == "mse":
-            self.loss_f = nn.MSELoss(reduction='none')
         
     def forward(self, x, return_log_var=False):
         x = self.input_layer(x)
@@ -74,27 +71,17 @@ class DynamicsModel(nn.Module):
     def calc_loss(self, inputs, targets, validate=False):
         mu, log_var = self(inputs, return_log_var=True)
         assert mu.shape[1:] == targets.shape[1:]
-        if self.loss_type == "maximum_likelihood":
-            if not validate:
-                inv_var = (-log_var).exp()
-                loss = ((mu - targets)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
-                return loss
-            else:
-                return ((mu - targets)**2).mean(-1).mean(-1)
+
+        if not validate:
+            inv_var = (-log_var).exp()
+            loss = ((mu - targets)**2 * inv_var).mean(-1).mean(-1).sum() + log_var.mean(-1).mean(-1).sum()
+            return loss
         else:
-            prediction = torch.normal(mu, torch.sqrt(torch.exp(log_var)))
-            assert prediction.shape == targets.shape
-            if not validate:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1).sum()
-                return loss
-            else:
-                loss = self.loss_f(prediction, targets).mean(-1).mean(-1)
-                return loss
+            return ((mu - targets)**2).mean(-1).mean(-1)
 
     def optimize(self, loss):
         self.optimizer.zero_grad()
-        if self.loss_type == "maximum_likelihood":
-            loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
+        loss += 0.01 * torch.sum(self.max_logvar) - 0.01 * torch.sum(self.min_logvar)
         loss.backward()
         self.optimizer.step()
        
@@ -104,7 +91,6 @@ class MBEnsemble():
                 
         self.device = device
         self.ensemble = []
-        self.probabilistic = True
         self.batch_size = config.batch_size
         self.validation_percentage = 0.2
         self.n_ensembles = config.ensembles
@@ -114,12 +100,12 @@ class MBEnsemble():
                                       hidden_layer=config.hidden_layer,
                                       hidden_size=config.hidden_size,
                                       lr=config.mb_lr,
-                                      loss_type=config.loss_type,
                                       device=device).to(device)
 
-        self.rollout_select = config.rollout_select
+
         self.elite_size = config.elite_size
         self.elite_idxs = []
+        self.dynamics_type = config.dynamics_type
         
         self.max_not_improvements = 5
         self._current_best = [1e10 for i in range(self.n_ensembles)]
@@ -155,7 +141,7 @@ class MBEnsemble():
                 train_label = torch.from_numpy(train_label).float().to(self.device)
                 loss = self.dynamics_model.calc_loss(train_input, train_label)
                 self.dynamics_model.optimize(loss)
-                epochs_trained += 1
+            epochs_trained += 1
                 
             # evaluation
             self.dynamics_model.eval()
@@ -170,7 +156,7 @@ class MBEnsemble():
             
         assert len(val_losses) == self.n_ensembles, f"epoch_losses: {len(val_losses)} =/= {self.n_ensembles}"
         
-        return val_losses, np.mean(epochs_trained)
+        return loss.detach(), val_losses, np.mean(epochs_trained)
     
     def test_break_condition(self, current_losses):
         keep_train = False
@@ -193,8 +179,6 @@ class MBEnsemble():
 
 
     def run_ensemble_prediction(self, states, actions):
-        states = torch.from_numpy(states).float()
-        actions = torch.from_numpy(actions).float()
         inputs = torch.cat((states, actions), axis=-1).to(self.device)
         inputs = inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
         with torch.no_grad():
@@ -203,6 +187,22 @@ class MBEnsemble():
         # [ensembles, batch, prediction_shape]
         assert mus.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
         assert var.shape == (self.n_ensembles, states.shape[0], states.shape[1] + 1)
-        return mus.cpu().numpy(), var.cpu().numpy()
+        
+        mus[:, :, :-1] += states.to(self.device)
+        mus = mus.mean(0)
+        std = torch.sqrt(var).mean(0)
+
+        if self.dynamics_type == "probabilistic":
+            predictions = torch.normal(mean=mus, std=std)
+        else:
+            predictions = mus
+
+        assert predictions.shape == (states.shape[0], states.shape[1] + 1)
+
+        next_states = predictions[:, :-1]
+        # TODO: add selection between given reward function or learned one
+        rewards = predictions[:, -1].unsqueeze(-1)
+        # TODO: add Termination function?
+        return next_states, rewards
             
     
