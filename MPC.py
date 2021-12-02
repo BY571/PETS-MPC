@@ -78,11 +78,10 @@ class CEM(MPC):
         self.k_best = config.k_best
         self.update_alpha = config.update_alpha # Add this to CEM config
         self.epsilon = 0.001
-        self.ub = 1
-        self.lb = -1
         self.device = device
         
     def get_action(self, state, model, noise=False):
+        state = torch.from_numpy(state[None, :]).float()
         initial_state = state.repeat((self.n_planner, 1)).to(self.device)
         mu = np.zeros(self.horizon*self.action_space)
         var = 5 * np.ones(self.horizon*self.action_space)
@@ -92,14 +91,13 @@ class CEM(MPC):
             states = initial_state
             returns = np.zeros((self.n_planner, 1))
             #variables
-            lb_dist = mu - self.lb
-            ub_dist = self.ub - mu
+            lb_dist = mu - self.action_low
+            ub_dist = self.action_high - mu
             constrained_var = np.minimum(np.minimum(np.square(lb_dist / 2), np.square(ub_dist / 2)), var)
             
             actions = X.rvs(size=[self.n_planner, self.horizon*self.action_space]) * np.sqrt(constrained_var) + mu
-            actions_t = torch.from_numpy(np.clip(actions, -1, 1).reshape(self.n_planner,
-                                                                         self.horizon,
-                                                                         self.action_space)).float().to(self.device)
+            actions = np.clip(actions, self.action_low, self.action_high)
+            actions_t = torch.from_numpy(actions.reshape(self.n_planner, self.horizon, self.action_space)).float().to(self.device)
             for t in range(self.horizon):
                 with torch.no_grad():
                     states, rewards = model.run_ensemble_prediction(states, actions_t[:, t, :])
@@ -110,9 +108,9 @@ class CEM(MPC):
             i += 1
         
         best_action_sequence = mu.reshape(self.horizon, -1)
-        best_action = np.copy(best_action_sequence[-1])
+        best_action = np.copy(best_action_sequence[0]) 
         assert best_action.shape == (self.action_space,)
-        return torch.from_numpy(best_action).float().to(self.device)
+        return best_action
             
     
     def select_k_best(self, rewards, action_hist):
@@ -150,13 +148,14 @@ class PDDM(MPC):
         self.device = device
         
     def get_action(self, state, model, noise=False):
-        initial_states = state.repeat(self.n_planner, 1).to(self.device)
+        state = torch.from_numpy(state[None, :]).float()
+        initial_states = state.repeat((self.n_planner, 1)).to(self.device)
         actions, returns = self.get_pred_trajectories(initial_states, model)
         optimal_action = self.update_mu(actions, returns)
        
         if noise:
             optimal_action += np.random.normal(0, 0.005, size=optimal_action.shape)
-        return torch.from_numpy(optimal_action).float().to(self.device)
+        return optimal_action
         
     def update_mu(self, action_hist, returns):
         assert action_hist.shape == (self.n_planner, self.horizon, self.action_space)
@@ -183,7 +182,7 @@ class PDDM(MPC):
             else:
                 actions[:, t, :] = self.beta * (self.mu[t, :] + u[:, t, :]) + (1 - self.beta) * actions[:, t-1, :]
         assert actions.shape == (self.n_planner, self.horizon, self.action_space), "Has shape {} but should have shape {}".format(actions.shape, (self.n_planner, self.horizon, self.action_space))
-        actions = np.clip(actions, -1, 1)
+        actions = np.clip(actions, self.action_low, self.action_high)
         return actions
     
     def get_pred_trajectories(self, states, model): 

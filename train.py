@@ -27,9 +27,9 @@ def get_config():
     
     ## MB params
     parser.add_argument("--mb_buffer_size", type=int, default=100_000, help="")
-    parser.add_argument("--ensembles", type=int, default=3, help="")
+    parser.add_argument("--ensembles", type=int, default=5, help="")
     parser.add_argument("--dynamics_type", type=str, default="probabilistic", choices=["probabilistic", "deterministic"], help="")
-    parser.add_argument("--elite_size", type=int, default=2, help="")
+    parser.add_argument("--elite_size", type=int, default=3, help="")
     parser.add_argument("--hidden_size", type=int, default=200, help="")
     parser.add_argument("--hidden_layer", type=int, default=2, help="")
     parser.add_argument("--mb_lr", type=float, default=1e-3, help="")
@@ -37,12 +37,13 @@ def get_config():
 
     #MPC params
     parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
-    parser.add_argument("--n_planner", type=int, default=50, help="") # 1000
-    parser.add_argument("--horizon", type=int, default=5, help="") # 30
+    parser.add_argument("--n_planner", type=int, default=500, help="") 
+    parser.add_argument("--horizon", type=int, default=24, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=3, help="")
     parser.add_argument("--k_best", type=int, default=5, help="")
+    parser.add_argument("--update_alpha", type=float, default=0.0, help="")
     # pddm specific
     parser.add_argument("--pddm_gamma", type=float, default=1.0, help="")
     parser.add_argument("--pddm_beta", type=float, default=0.5, help="")
