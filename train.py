@@ -49,8 +49,8 @@ def get_config():
     parser.add_argument("--k_best", type=int, default=5, help="")
     parser.add_argument("--update_alpha", type=float, default=0.0, help="")
     # pddm specific
-    parser.add_argument("--pddm_gamma", type=float, default=1.0, help="")
-    parser.add_argument("--pddm_beta", type=float, default=0.5, help="")
+    parser.add_argument("--gamma", type=float, default=1.0, help="")
+    parser.add_argument("--beta", type=float, default=0.5, help="")
 
     
 
