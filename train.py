@@ -19,14 +19,14 @@ from causal_world.task_generators import generate_task
 def get_config():
     parser = argparse.ArgumentParser(description='RL')
 
-    parser.add_argument("--run_name", type=str, default="PETS-MPC", help="Run name, default: PETS-MPC")
+    parser.add_argument("--run_name", type=str, default="Causal_World", help="Run name, default: PETS-MPC")
     parser.add_argument("--env_task", type=str, default="pushing", help="Causal world env task")
 
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes, default: 100")
     parser.add_argument("--episode_length", type=int, default=500, help="Length of one episode, default: 1000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--log_video", type=int, default=0, help="Log agent behaviour to wanbd when set to 1, default: 0")
-    parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
+    parser.add_argument("--save_every", type=int, default=2, help="Saves the network every x epochs, default: 25")
     parser.add_argument("--batch_size", type=int, default=256, help="Batch size, default: 256")
     
     ## MB params
@@ -149,6 +149,9 @@ def train(config):
                 if len(mp4list) > 1:
                     mp4 = mp4list[-2]
                     wandb.log({"gameplays": wandb.Video(mp4, caption='episode: '+str(i-10), fps=4, format="gif"), "Episode": i})
+            
+            if i % config.save_every:
+                save(config, "Ensemble", ensemble.dynamics_model, wandb, i)
 
 
 if __name__ == "__main__":
