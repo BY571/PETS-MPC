@@ -8,6 +8,6 @@ To run type: `python train.py` in your terminal.
 
 ## Results
 
-solving Pendulum instantly with random shooting:
+### Pendulum Environment
 
-![alt_text](imgs/pendulum_single.png)
+![alt_text](imgs/Pendulum_rs_cem_pddm.png)

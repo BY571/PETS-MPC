@@ -63,7 +63,7 @@ def train(config):
     evaluation_env = gym.make(config.env)
     env.seed(config.seed)
     evaluation_env.seed(config.seed)
-    
+    # TODO make this depending on action space type
     state_size = evaluation_env.observation_space.shape[0]
     action_size = evaluation_env.action_space.shape[0]
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

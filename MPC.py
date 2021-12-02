@@ -85,7 +85,7 @@ class CEM(MPC):
         initial_state = state.repeat((self.n_planner, 1)).to(self.device)
         mu = np.zeros(self.horizon*self.action_space)
         var = 5 * np.ones(self.horizon*self.action_space)
-        X = stats.truncnorm(self.lb, self.ub, loc=np.zeros_like(mu), scale=np.ones_like(mu))
+        X = stats.truncnorm(self.action_low, self.action_high, loc=np.zeros_like(mu), scale=np.ones_like(mu))
         i = 0
         while ((i < self.iter_update_steps) and (np.max(var) > self.epsilon)):
             states = initial_state
