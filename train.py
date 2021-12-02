@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 def get_config():
     parser = argparse.ArgumentParser(description='RL')
-    parser.add_argument("--run_name", type=str, default="PETS-MPC", help="Run name, default: PETS-MPC")
+    parser.add_argument("--run_name", type=str, default="Model_Based_MPC", help="Run name, default: Model_Based_MPC")
     parser.add_argument("--env", type=str, default="Pendulum-v1", help="Gym environment name, default: Pendulum-v0")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes, default: 100")
     parser.add_argument("--episode_length", type=int, default=500, help="Length of one episode, default: 1000")
@@ -71,7 +71,7 @@ def train(config):
     steps = 0
     average10 = deque(maxlen=10)
     
-    with wandb.init(project="PETS", name=config.run_name, config=config):
+    with wandb.init(project="Model_Based_MPC", name=config.run_name, config=config):
         
         if config.mpc_type == "random":
             mpc = RandomShooting(evaluation_env.action_space,
@@ -108,7 +108,7 @@ def train(config):
                 if steps % config.update_frequency == 0:
                     train_inputs, train_labels = mb_buffer.get_dataloader()
                     train_loss, losses, trained_epochs = ensemble.train(train_inputs, train_labels)           
-                    wandb.log({"Episode": i, "Train loss": train_loss.item(), "MB validation loss": np.mean(losses), "MB mean trained epochs": trained_epochs}, step=steps)
+                    wandb.log({"Episode": i, "Train loss": train_loss.item(), "Validation loss": np.mean(losses), "Trained epochs": trained_epochs}, step=steps)
                     tqdm.write("\rEpisode: {} | Ensemble losses: {}".format(i, losses))
 
                 action = mpc.get_action(state, ensemble, noise=config.action_noise)

@@ -49,8 +49,8 @@ class DynamicsModel(nn.Module):
         self.log_var = Ensemble_FC_Layer(hidden_size, state_size + 1, ensemble_size)
         
 
-        self.min_logvar = nn.Parameter((-torch.ones((1, state_size + 1)).float() * 10).to(device), requires_grad=False)
-        self.max_logvar = nn.Parameter((torch.ones((1, state_size + 1)).float() / 2).to(device), requires_grad=False)
+        self.min_logvar = (-torch.ones((1, state_size + 1)).float() * 10).to(device)
+        self.max_logvar = (torch.ones((1, state_size + 1)).float() / 2).to(device)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         
