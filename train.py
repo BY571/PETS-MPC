@@ -141,6 +141,9 @@ def train(config):
                     mp4 = mp4list[-2]
                     wandb.log({"gameplays": wandb.Video(mp4, caption='episode: '+str(i-10), fps=4, format="gif"), "Episode": i})
 
+            if i % config.save_every:
+                save(config, "Ensemble", ensemble.dynamics_model, wandb, i)
+
 
 if __name__ == "__main__":
     config = get_config()
