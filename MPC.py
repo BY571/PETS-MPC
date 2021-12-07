@@ -91,8 +91,8 @@ class CEM(MPC):
             states = initial_state
             returns = np.zeros((self.n_planner, 1))
             #variables
-            lb_dist = mu - self.action_low
-            ub_dist = self.action_high - mu
+            lb_dist = (mu.view((self.horizon, self.action_space)) - self.action_low).view(self.horizon*self.action_space)
+            ub_dist = (self.action_high - mu.view((self.horizon, self.action_space))).view(self.horizon*self.action_space)
             constrained_var = np.minimum(np.minimum(np.square(lb_dist / 2), np.square(ub_dist / 2)), var)
             
             actions = X.rvs(size=[self.n_planner, self.horizon*self.action_space]) * np.sqrt(constrained_var) + mu
