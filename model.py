@@ -3,7 +3,21 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-    
+def init_weights(m):
+    def truncated_normal_init(t, mean=0.0, std=0.01):
+        torch.nn.init.normal_(t, mean=mean, std=std)
+        while True:
+            cond = torch.logical_or(t < mean - 2 * std, t > mean + 2 * std)
+            if not torch.sum(cond):
+                break
+            t = torch.where(cond, torch.nn.init.normal_(torch.ones(t.shape), mean=mean, std=std), t)
+        return t
+
+    if type(m) == nn.Linear or isinstance(m, Ensemble_FC_Layer):
+        input_dim = m.in_features
+        truncated_normal_init(m.weight, std=1 / (2 * np.sqrt(input_dim)))
+        m.bias.data.fill_(0.0)
+
 class Ensemble_FC_Layer(nn.Module):
     def __init__(self, in_features, out_features, ensemble_size, bias=True):
         super(Ensemble_FC_Layer, self).__init__()
@@ -100,7 +114,9 @@ class MBEnsemble():
                                       hidden_layer=config.hidden_layer,
                                       hidden_size=config.hidden_size,
                                       lr=config.mb_lr,
-                                      device=device).to(device)
+                                      device=device)
+
+        self.dynamics_model.apply(init_weights).to(device)
 
 
         self.elite_size = config.elite_size
