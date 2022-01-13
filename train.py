@@ -37,8 +37,8 @@ def get_config():
     parser.add_argument("--traj_plot_state_dim", type=int, default=0, help="Dimension which should get plotted for the MPC plot, default=0")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem", "pddm"], help="")
-    parser.add_argument("--n_planner", type=int, default=250, help="") 
+    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
+    parser.add_argument("--n_planner", type=int, default=500, help="") 
     parser.add_argument("--horizon", type=int, default=12, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
