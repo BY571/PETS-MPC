@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torch.nn.functional as F
+from utils import TorchStandardScaler
 
 def init_weights(m):
     def truncated_normal_init(t, mean=0.0, std=0.01):
@@ -118,6 +119,7 @@ class MBEnsemble():
 
         self.dynamics_model.apply(init_weights).to(device)
 
+        self.scaler = TorchStandardScaler()
 
         self.elite_size = config.elite_size
         self.elite_idxs = []
@@ -138,7 +140,11 @@ class MBEnsemble():
         num_validation = int(inputs.shape[0] * self.validation_percentage)
         train_inputs, train_labels = inputs[num_validation:], labels[num_validation:]
         holdout_inputs, holdout_labels = inputs[:num_validation], labels[:num_validation]
-                
+
+        self.scaler.fit(train_inputs)
+        train_inputs = self.scaler.transform(train_inputs)
+        holdout_inputs = self.scaler.transform(holdout_inputs)
+
         holdout_inputs = torch.from_numpy(holdout_inputs).float().to(self.device)
         holdout_labels = torch.from_numpy(holdout_labels).float().to(self.device)
         holdout_inputs = holdout_inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
@@ -195,7 +201,8 @@ class MBEnsemble():
 
 
     def run_ensemble_prediction(self, states, actions):
-        inputs = torch.cat((states, actions), axis=-1).to(self.device)
+        inputs = torch.cat((states, actions), axis=-1).cpu()
+        inputs = torch.from_numpy(self.scaler.transform(inputs.numpy())).float().to(self.device)
         inputs = inputs[None, :, :].repeat(self.n_ensembles, 1, 1)
         with torch.no_grad():
             mus, var = self.dynamics_model(inputs, return_log_var=False)

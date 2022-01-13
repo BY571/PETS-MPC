@@ -17,9 +17,9 @@ from tqdm import tqdm
 def get_config():
     parser = argparse.ArgumentParser(description='RL')
     parser.add_argument("--run_name", type=str, default="Model_Based_MPC", help="Run name, default: Model_Based_MPC")
-    parser.add_argument("--env", type=str, default="Pendulum-v1", help="Gym environment name, default: Pendulum-v0")
+    parser.add_argument("--env", type=str, default="Hopper-v2", help="Gym environment name, default: Pendulum-v0")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes, default: 100")
-    parser.add_argument("--episode_length", type=int, default=500, help="Length of one episode, default: 1000")
+    parser.add_argument("--episode_length", type=int, default=1000, help="Length of one episode, default: 1000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--log_video", type=int, default=0, help="Log agent behaviour to wanbd when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
@@ -34,11 +34,12 @@ def get_config():
     parser.add_argument("--hidden_layer", type=int, default=2, help="")
     parser.add_argument("--mb_lr", type=float, default=1e-3, help="")
     parser.add_argument("--update_frequency", type=int, default=250, help="")
+    parser.add_argument("--traj_plot_state_dim", type=int, default=0, help="Dimension which should get plotted for the MPC plot, default=0")
 
     #MPC params
-    parser.add_argument("--mpc_type", type=str, default="random", choices=["random", "cem", "pddm"], help="")
-    parser.add_argument("--n_planner", type=int, default=500, help="") 
-    parser.add_argument("--horizon", type=int, default=24, help="")
+    parser.add_argument("--mpc_type", type=str, default="cem", choices=["random", "cem", "pddm"], help="")
+    parser.add_argument("--n_planner", type=int, default=250, help="") 
+    parser.add_argument("--horizon", type=int, default=12, help="")
     parser.add_argument("--action_noise", type=int, default=0, help="")
     # cem specific
     parser.add_argument("--iter_update_steps", type=int, default=3, help="")
@@ -111,8 +112,9 @@ def train(config):
                     wandb.log({"Episode": i, "Train loss": train_loss.item(), "Validation loss": np.mean(losses), "Trained epochs": trained_epochs}, step=steps)
                     tqdm.write("\rEpisode: {} | Ensemble losses: {}".format(i, losses))
 
-                action = mpc.get_action(state, ensemble, noise=config.action_noise)
-                
+                action, fig = mpc.get_action(state, ensemble, noise=config.action_noise)
+                if steps % config.update_frequency == 0:
+                    wandb.log({"Planning Trajectories": fig, "Episode ": i}, step=steps)
                 next_state, reward, done, _ = env.step(action)
 
                 mb_buffer.add(state, action, reward, next_state, done)
@@ -132,7 +134,7 @@ def train(config):
                        "Average10": np.mean(average10),
                        "Steps": steps,
                        "Episode": i,
-                       "Env Buffer size": mb_buffer.__len__()})
+                       "Env Buffer size": mb_buffer.__len__()}, step=steps)
 
             # log evaluation runs to wandb
             if config.log_video:

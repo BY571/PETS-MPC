@@ -34,10 +34,22 @@ def evaluate(env, mpc, model, eval_runs=5):
 
         rewards = 0
         while True:
-            action = mpc.get_action(state, model, noise=False)
+            action, _ = mpc.get_action(state, model, noise=False)
             state, reward, done, _ = env.step(action)
             rewards += reward
             if done:
                 break
         reward_batch.append(rewards)
     return np.mean(reward_batch)
+
+class TorchStandardScaler:
+    def fit(self, x):
+        self.mu = np.mean(x, axis=0, keepdims=True)
+        self.std = np.std(x, axis=0, keepdims=True)
+        self.std[self.std < 1e-12] = 1.0
+    def transform(self, x):
+        x -= self.mu
+        x /= self.std
+        return x
+    def inverse_transform(self, x):
+        return self.std * x + self.mu
